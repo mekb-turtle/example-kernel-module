@@ -37,16 +37,16 @@ static ssize_t custom_read(struct file* file, char __user* user_buffer, size_t c
     return bytes_to_copy;
 }
 
-static struct file_operations ops = { // file operations
+static struct file_operations ops = { // File operations
 	.owner = THIS_MODULE,
 	.read = custom_read
 };
 
-static unsigned num_devices = 1; // number of char devices we are allocating
-static dev_t dev_id; // device ID
-static struct cdev cdev; // character device, contains major/minor number, operations, etc
-static struct class* class; // class, like a group of devices, e.g input, block, char, net
-static struct device* device; // the device itself, containing the class, device ID, and a name
+static unsigned num_devices = 1; // Number of char devices we are allocating
+static dev_t dev_id; // Device ID
+static struct cdev cdev; // Character device, contains major/minor number, operations, etc
+static struct class* class; // Class, like a group of devices, e.g input, block, char, net
+static struct device* device; // The device, containing the class, device ID, and a name
 
 static int __init module_custom_init(void)
 {
@@ -62,7 +62,7 @@ static int __init module_custom_init(void)
 
 	// Initialize character device
 	cdev_init(&cdev, &ops);
-	if ((retval = cdev_add(&cdev, dev_id, num_devices)) < 0) {
+	if ((retval = cdev_add(&cdev, dev_id, num_devices))) {
 		// Unregister device ID before returning
 		unregister_chrdev_region(dev_id, num_devices);
 		printk(KERN_WARNING "Failed to add cdev\n");
@@ -70,13 +70,43 @@ static int __init module_custom_init(void)
 	}
 
 	// Initialize class
-	class = class_create("helloworld_class");
+	class = class_create("hello_world");
+	if (IS_ERR(class)) {
+		// also unregister character device
+		cdev_del(&cdev);
+		unregister_chrdev_region(dev_id, num_devices);
+		printk(KERN_WARNING "Failed to create class\n");
+		return PTR_ERR(class);
+	}
 
 	// Initialize device with the class, device ID, and a name
 	// The name will be used as the filename, e.g /dev/helloworld
 	device = device_create(class, NULL, dev_id, NULL, "helloworld");
+	if (IS_ERR(device)) {
+		// also unregister class
+		class_destroy(class);
+		cdev_del(&cdev);
+		unregister_chrdev_region(dev_id, num_devices);
+		printk(KERN_WARNING "Failed to create device\n");
+		return PTR_ERR(device);
+	}
 
-	printk(KERN_INFO "Character device file loaded\n");
+	// TODO
+	// Set mode (use S_IRUGO | SIWUGO if you want RW)
+	/*
+	if ((retval = sysfs_chmod_file(&device->kobj, , S_IRUGO)) < 0) {
+		// also unregister device
+		device_destroy(class, dev_id);
+		class_destroy(class);
+		cdev_del(&cdev);
+		unregister_chrdev_region(dev_id, num_devices);
+		printk(KERN_WARNING "Failed to create device\n");
+		return PTR_ERR(device);
+	}
+	put_device(device);
+	*/
+
+	printk(KERN_INFO "Character device created\n");
 
 	return 0;
 }

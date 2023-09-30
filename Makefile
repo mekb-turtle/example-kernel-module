@@ -1,4 +1,4 @@
-obj-m += test_module.o
+obj-m += example_module.o
 
 all:
 	make -C "/lib/modules/$$(uname -r)/build" M="$$PWD" modules
